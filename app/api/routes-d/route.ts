@@ -10,6 +10,9 @@ export async function GET() {
         status: '/api/routes-d/bulk-invoices/status?jobId={id}',
         template: '/api/routes-d/bulk-invoices/template',
       },
+      utils: {
+        feeQuote: '/api/routes-d/utils/fee-quote?amount={usd_amount}',
+      },
     },
   })
 }
