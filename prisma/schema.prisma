@@ -27,6 +27,7 @@ model User {
   apiKeys          ApiKey[]
   autoSwapRule     AutoSwapRule?
   brandingSettings BrandingSettings?
+  webhooks         UserWebhook[]
 }
 
 model Wallet {
@@ -234,4 +235,21 @@ model BrandingSettings {
   updatedAt     DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserWebhook {
+  id               String    @id @default(uuid())
+  userId           String
+  targetUrl        String    @db.VarChar(512)
+  signingSecret    String    @db.VarChar(255)
+  description      String?   @db.VarChar(100)
+  isActive         Boolean   @default(true)
+  subscribedEvents String[]  @default(["invoice.paid"])
+  lastTriggeredAt  DateTime?
+  createdAt        DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isActive])
 }

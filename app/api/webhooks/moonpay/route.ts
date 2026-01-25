@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { sendPaymentReceivedEmail } from '@/lib/email'
 import { processAutoSwap } from '@/lib/auto-swap'
+import { dispatchWebhooks } from '@/lib/webhooks'
 
 export async function POST(request: NextRequest) {
   try {
@@ -71,6 +72,17 @@ export async function POST(request: NextRequest) {
         })
       }
     }
+
+    // Dispatch webhook for invoice.paid event
+    await dispatchWebhooks(invoice.userId, 'invoice.paid', {
+      invoiceId: invoice.id,
+      invoiceNumber: invoice.invoiceNumber,
+      amount: paymentAmount,
+      currency: invoice.currency,
+      clientEmail: invoice.clientEmail,
+      clientName: invoice.clientName,
+      paidAt: new Date().toISOString(),
+    })
 
     return NextResponse.json({ received: true })
   } catch (error) {
