@@ -13,20 +13,27 @@ model User {
   email            String            @unique
   name             String?
   phone            String?
-  twoFactorSecret  String?
-  twoFactorEnabled Boolean           @default(false)
-  backupCodes      String[]          @default([])
+  referralCode     String?           @unique
+  referredById     String?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
+  backupCodes      String[]          @default([])
+  twoFactorEnabled Boolean           @default(false)
+  twoFactorSecret  String?
 
-  wallet           Wallet?
-  bankAccounts     BankAccount[]
-  invoices         Invoice[]
-  transactions     Transaction[]
-  reminderSettings ReminderSettings?
-  apiKeys          ApiKey[]
-  autoSwapRule     AutoSwapRule?
-  webhooks         UserWebhook[]
+  wallet            Wallet?
+  bankAccounts      BankAccount[]
+  invoices          Invoice[]
+  transactions      Transaction[]
+  reminderSettings  ReminderSettings?
+  autoSwapRule      AutoSwapRule?
+  referredBy        User?               @relation("UserReferrals", fields: [referredById], references: [id])
+  referrals         User[]              @relation("UserReferrals")
+  referralEarnings  ReferralEarning[]   @relation("ReferrerEarnings")
+  earningsFromMe    ReferralEarning[]   @relation("ReferredUserEarnings")
+  paymentAdvances   PaymentAdvance[]
+  apiKeys           ApiKey[]
+  webhooks          UserWebhook[]
 }
 
 model Wallet {
@@ -51,7 +58,7 @@ model BankAccount {
 
   user          User           @relation(fields: [userId], references: [id])
   withdrawals   Transaction[]  @relation("WithdrawalBank")
-  AutoSwapRule  AutoSwapRule[]
+  autoSwapRules AutoSwapRule[]
 }
 
 model Invoice {
@@ -80,13 +87,15 @@ model Invoice {
   escrowReleasedAt        DateTime?
   escrowDisputedAt        DateTime?
   escrowEvents            EscrowEvent[]
+  lienActive              Boolean           @default(false)
+  advances                PaymentAdvance[]
 }
 
 model PaymentReminder {
   id           String   @id @default(uuid())
   invoiceId    String
-  reminderType String   // 'before_due', 'on_due', 'overdue', 'manual'
-  daysOffset   Int?     // e.g., -3, 0, 3. Null for manual.
+  reminderType String
+  daysOffset   Int?
   sentAt       DateTime @default(now())
   createdAt    DateTime @default(now())
 
@@ -94,40 +103,58 @@ model PaymentReminder {
 }
 
 model ReminderSettings {
-  id             String   @id @default(uuid())
-  userId         String   @unique
-  enabled        Boolean  @default(true)
-  beforeDueDays  Int[]    @default([3, 1])
-  onDueEnabled   Boolean  @default(true)
-  afterDueDays   Int[]    @default([1, 3, 7])
-  customMessage  String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  enabled       Boolean  @default(true)
+  beforeDueDays Int[]    @default([3, 1])
+  onDueEnabled  Boolean  @default(true)
+  afterDueDays  Int[]    @default([1, 3, 7])
+  customMessage String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Transaction {
-  id            String    @id @default(uuid())
-  userId        String
-  type          String
-  status        String    @default("pending")
-  amount        Decimal   @db.Decimal(10, 2)
-  currency      String    @default("USD")
-  ngnAmount     Decimal?  @db.Decimal(15, 2)
-  exchangeRate  Decimal?  @db.Decimal(10, 4)
-  invoiceId     String?   @unique
-  bankAccountId String?
-  txHash        String?
-  externalId    String?   @unique
-  error         String?
-  createdAt     DateTime  @default(now())
-  completedAt   DateTime?
-  autoSwapTriggered Boolean @default(false) // Whether this was triggered by auto-swap
+  id                String       @id @default(uuid())
+  userId            String
+  type              String
+  status            String       @default("pending")
+  amount            Decimal      @db.Decimal(10, 2)
+  currency          String       @default("USD")
+  ngnAmount         Decimal?     @db.Decimal(15, 2)
+  exchangeRate      Decimal?     @db.Decimal(10, 4)
+  invoiceId         String?      @unique
+  bankAccountId     String?
+  txHash            String?
+  createdAt         DateTime     @default(now())
+  completedAt       DateTime?
+  autoSwapTriggered Boolean      @default(false)
+  error             String?
+  externalId        String?      @unique
 
   user        User         @relation(fields: [userId], references: [id])
   invoice     Invoice?     @relation(fields: [invoiceId], references: [id])
   bankAccount BankAccount? @relation("WithdrawalBank", fields: [bankAccountId], references: [id])
+}
+
+model ReferralEarning {
+  id             String   @id @default(uuid())
+  referrerId     String
+  referredUserId String
+  invoiceId      String
+  amountUsdc     Decimal  @db.Decimal(18, 6)
+  platformFee    Decimal  @db.Decimal(18, 6)
+  status         String   @default("earned")
+  createdAt      DateTime @default(now())
+
+  referrer     User @relation("ReferrerEarnings", fields: [referrerId], references: [id], onDelete: Cascade)
+  referredUser User @relation("ReferredUserEarnings", fields: [referredUserId], references: [id], onDelete: Cascade)
+
+  @@index([referrerId])
+  @@index([referredUserId])
+  @@index([createdAt])
 }
 
 model ApiKey {
@@ -175,18 +202,18 @@ model BulkInvoiceJob {
 }
 
 model Dispute {
-  id               String    @id @default(uuid())
-  invoiceId        String    @unique
-  initiatedBy      String    // 'freelancer' or 'client'
-  initiatorEmail   String
-  reason           String
-  requestedAction  String    // 'refund', 'revision'
-  status           String    @default("open") // open, resolved, closed
-  resolution       String?
-  resolvedBy       String?   // 'admin' or email of resolver
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  resolvedAt       DateTime?
+  id              String    @id @default(uuid())
+  invoiceId       String    @unique
+  initiatedBy     String
+  initiatorEmail  String
+  reason          String
+  requestedAction String
+  status          String    @default("open")
+  resolution      String?
+  resolvedBy      String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  resolvedAt      DateTime?
 
   invoice  Invoice          @relation(fields: [invoiceId], references: [id])
   messages DisputeMessage[]
@@ -238,4 +265,31 @@ model UserWebhook {
 
   @@index([userId])
   @@index([isActive])
+}
+
+model PaymentAdvance {
+  id                      String    @id @default(uuid())
+  userId                  String
+  invoiceId               String
+  requestedAmountUSDC     Decimal   @db.Decimal(10, 2)
+  advancedAmountUSDC      Decimal   @db.Decimal(10, 2)
+  advancedAmountNGN       Decimal   @db.Decimal(15, 2)
+  exchangeRate            Decimal   @db.Decimal(10, 4)
+  feePercentage           Decimal   @db.Decimal(5, 2) @default(2.00)
+  feeAmountUSDC           Decimal   @db.Decimal(10, 2)
+  totalRepaymentUSDC      Decimal   @db.Decimal(10, 2)
+  status                  String    @default("pending")
+  yellowCardTransactionId String?
+  disbursedAt             DateTime?
+  repaidAt                DateTime?
+  error                   String?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([invoiceId])
+  @@index([status])
 }
