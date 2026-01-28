@@ -35,6 +35,7 @@ model User {
   apiKeys          ApiKey[]
   brandingSettings BrandingSettings?
   webhooks         UserWebhook[]
+  userBadges       UserBadge[]
   auditEvents      AuditEvent[]
   savingsGoals     SavingsGoal[]
 }
@@ -365,10 +366,27 @@ model SavingsGoal {
   @@index([status])
 }
 
+model AuditEvent {
+  id        String   @id @default(uuid())
+  invoiceId String
+  eventType String   @db.VarChar(50)
+  actorId   String?
+  metadata  Json?
+  signature String
+  createdAt DateTime @default(now())
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  actor   User?   @relation(fields: [actorId], references: [id])
+
+  @@index([invoiceId])
+  @@index([eventType])
+  @@index([createdAt])
+}
+
 model ClientReputation {
   id            String    @id @default(uuid())
   clientEmail   String    @unique @map("client_email")
-  domainType    String?   @map("domain_type") // 'corporate' | 'personal' | 'disposable'
+  domainType    String?   @map("domain_type")
   paymentScore  Int       @default(0) @map("payment_score")
   isVerified    Boolean   @default(false) @map("is_verified")
   lastCheckedAt DateTime  @default(now()) @map("last_checked_at")
@@ -376,4 +394,34 @@ model ClientReputation {
 
   @@index([clientEmail])
   @@map("client_reputations")
+}
+
+model BadgeDefinition {
+  id               String   @id @default(uuid())
+  name             String   @db.VarChar(100)
+  description      String?
+  criteriaJson     Json
+  imageUrl         String?  @db.VarChar(512)
+  stellarAssetCode String   @db.VarChar(12)
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+
+  userBadges UserBadge[]
+
+  @@index([stellarAssetCode])
+}
+
+model UserBadge {
+  id             String   @id @default(uuid())
+  userId         String
+  badgeId        String
+  stellarTxHash  String   @db.VarChar(255)
+  issuedAt       DateTime @default(now())
+
+  user  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge BadgeDefinition @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeId])
+  @@index([userId])
+  @@index([badgeId])
 }
