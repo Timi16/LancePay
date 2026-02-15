@@ -1,9 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
-import { sendPaymentReceivedEmail } from "@/lib/email";
-import { createReferralEarning } from "@/lib/referral";
-import { processAutoSwap } from "@/lib/auto-swap";
-import { dispatchWebhooks } from "@/lib/webhooks";
+import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/db'
+import { sendPaymentReceivedEmail } from '@/lib/email'
+import { createReferralEarning } from '@/lib/referral'
+import { processAutoSwap } from '@/lib/auto-swap'
+import { dispatchWebhooks } from '@/lib/webhooks'
+import { updateUserTrustScore } from '@/lib/reputation'
 
 export async function POST(request: NextRequest) {
   try {
@@ -65,7 +66,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const paymentAmount = Number(invoice.amount);
+    const paymentAmount = Number(invoice.amount)
 
     // Process auto-swap if user has an active rule
     const autoSwapResult = await processAutoSwap(
@@ -107,7 +108,15 @@ export async function POST(request: NextRequest) {
       paidAt: new Date().toISOString(),
     });
 
-    return NextResponse.json({ received: true });
+    // Update trust score (synchronous as per requirements)
+    try {
+      await updateUserTrustScore(invoice.userId)
+    } catch (error) {
+      console.error('Failed to update trust score after payment:', error)
+      // Don't fail the payment if score update fails
+    }
+
+    return NextResponse.json({ received: true })
   } catch (error) {
     console.error("MoonPay webhook error:", error);
     return NextResponse.json({ received: true });
