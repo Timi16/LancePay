@@ -16,7 +16,7 @@ export function middleware(request: NextRequest) {
     },
   });
 
-  // Add nonce to response headers so it can be accessed in headers()
+  // Add nonce to response headers so it can be accessed in headers().
   response.headers.set('x-nonce', nonce);
 
   return response;
