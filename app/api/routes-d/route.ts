@@ -34,6 +34,9 @@ export async function GET() {
       verification: {
         clientCheck: '/api/routes-d/verification/client-check?email={email}',
       },
+      currency: {
+        rates: '/api/routes-d/currency/exchange-rates',
+      },
     },
   })
 }
