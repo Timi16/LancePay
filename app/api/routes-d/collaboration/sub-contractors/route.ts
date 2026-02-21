@@ -230,6 +230,26 @@ export async function DELETE(request: NextRequest) {
 
     const { collaboratorId } = validation.data
 
+    // Additional ownership check (defense-in-depth): ensure the collaborator exists
+    // and the invoice belongs to the authenticated user before attempting removal.
+    const existing = await prisma.invoiceCollaborator.findUnique({
+      where: { id: collaboratorId },
+      include: { invoice: true },
+    })
+
+    if (!existing) {
+      return NextResponse.json({ error: 'Collaborator not found' }, { status: 404 })
+    }
+
+    if (existing.invoice.userId !== auth.user.id) {
+      return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
+    }
+
+    if (existing.payoutStatus === 'completed') {
+      return NextResponse.json({ error: 'Cannot remove a collaborator who has already been paid' }, { status: 400 })
+    }
+
+    // Now call the shared logic which also performs checks — keep for single source of truth.
     await removeCollaborator(collaboratorId, auth.user.id)
 
     return NextResponse.json({
