@@ -36,6 +36,8 @@ export async function GET() {
       },
       support: {
         createTicket: '/api/routes-d/support/tickets',
+      currency: {
+        rates: '/api/routes-d/currency/exchange-rates',
       },
     },
   })
