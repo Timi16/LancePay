@@ -34,12 +34,13 @@ export async function GET() {
       verification: {
         clientCheck: '/api/routes-d/verification/client-check?email={email}',
       },
-      support: {
-        createTicket: '/api/routes-d/support/tickets',
-      currency: {
-        rates: '/api/routes-d/currency/exchange-rates',
+      settings: {
+        rotateKey: '/api/routes-d/settings/api-keys',
       },
-    },
+      merchants: {
+        onboarding: '/api/routes-d/merchants/onboarding',
+      },
+    }
   })
 }
 
