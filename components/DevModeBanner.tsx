@@ -1,25 +1,18 @@
 "use client";
-
 import Link from "next/link";
 import { AlertCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 
-/**
- * Development Mode Banner
- * Shows when Privy is not configured, directing users to mock login
- */
-export function DevModeBanner({ nonce }: { nonce?: string }) {
+export function DevModeBanner() {
   const [showBanner, setShowBanner] = useState(false);
 
   useEffect(() => {
-    // Check if Privy is configured (client-side only)
     const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID || "";
     const configured =
       appId && appId !== "YOUR_PRIVY_APP_ID_HERE" && appId.startsWith("clp");
     setShowBanner(!configured);
   }, []);
 
-  // Don't show banner if Privy is configured
   if (!showBanner) return null;
 
   return (
@@ -41,7 +34,7 @@ export function DevModeBanner({ nonce }: { nonce?: string }) {
               >
                 Mock Login
               </Link>
-              <a
+              
                 href="https://dashboard.privy.io"
                 target="_blank"
                 rel="noopener noreferrer"
